@@ -1,0 +1,49 @@
+---
+title: "Interpretabilidad de modelos"
+author: "Andrea Olmos, Ulises López"
+date: "19/11/2021"
+output: html_document
+---
+
+# posibles fuentes de código
+
+https://cran.r-project.org/web/packages/lime/vignettes/Understanding_lime.html
+
+
+
+Librerías
+```{r}
+#install.packages('lime')
+library(lime)
+library(caret)
+```
+
+```{r}
+# Split up the data set
+iris_test <- iris[1:5, 1:4]
+iris_train <- iris[-(1:5), 1:4]
+iris_lab <- iris[[5]][-(1:5)]
+```
+
+
+```{r}
+# Create Random Forest model on iris data
+model <- train(iris_train, iris_lab, method = 'rf')
+```
+
+
+```{r}
+# Create an explainer object
+explainer <- lime(iris_train, model)
+```
+
+
+```{r}
+# Explain new observation
+explanation <- explain(iris_test, explainer, n_labels = 1, n_features = 2)
+```
+```{r}
+# And can be visualised directly
+plot_features(explanation)
+```
+
