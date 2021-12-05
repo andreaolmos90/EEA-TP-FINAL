@@ -2,48 +2,138 @@
 title: "Interpretabilidad de modelos"
 author: "Andrea Olmos, Ulises López"
 date: "19/11/2021"
-output: html_document
+output: 
+  html_document:
+    theme: united
 ---
+# LIME
+- Modelo a explicar: LightGBM
+- Local surrogate model: regresión lineal
 
-# posibles fuentes de código
-
-https://cran.r-project.org/web/packages/lime/vignettes/Understanding_lime.html
-
-
-
-Librerías
+## Librerías
 ```{r}
 #install.packages('lime')
+#install.packages('caret')
+library(data.table)
 library(lime)
 library(caret)
+require("lightgbm")
+library(xgboost)
 ```
 
+## Datos
 ```{r}
-# Split up the data set
-iris_test <- iris[1:5, 1:4]
-iris_train <- iris[-(1:5), 1:4]
-iris_lab <- iris[[5]][-(1:5)]
+#datasets
+dataset = fread("../datasets/bank_marketing_dataset.csv") #kaggle
+dataset2 = fread("../datasets/bank-full.csv") #uci
+```
+
+- Vemos un head del dataset
+
+```{r}
+head(dataset)
+```
+- Paso las columnas de tipo character a categóricas
+
+```{r}
+dataset = mutate_if(dataset, is.character, as.factor)
+head(dataset)
+```
+
+- Armo dataset numerico para ver si el problema son las categoricas
+```{r}
+vars = colnames(dataset)
+mascara = unlist(lapply(dataset,is.numeric), use.names = F)
+dataset_num = dataset[,..mascara]
+
+dataset_num = cbind(dataset_num, subscribed = dataset$subscribed)
+#dataset_num[, V2:=NULL]
+dataset_num
+#dataset_num$subscribed = as.factor(ifelse(dataset_num$subscribed == "no", 0, 1))
+dataset_num
+table(dataset_num$subscribed)
+```
+
+
+- Divido en train y test
+
+```{r}
+# Dividimos el dataset con createDataPartition de caret
+
+inTrain = createDataPartition(
+  y = dataset_num$subscribed,
+  ## the outcome data are needed
+  p = .75,
+  ## The percentage of data in the
+  ## training set
+  list = FALSE
+)
+#tienen la clase a predecir
+training = dataset_num[ inTrain,]
+testing  = dataset_num[-inTrain,]
+
 ```
 
 
 ```{r}
-# Create Random Forest model on iris data
-model <- train(iris_train, iris_lab, method = 'rf')
+#dummies de las factor
+#data_model = model.matrix(subscribed~.,data=training)
+#head(data_model)
 ```
 
-
+- Entreno xgboost
 ```{r}
+#dataset_num$subscribed = ifelse(dataset_num$subscribed == "no", 0, 1)
+#ctrl2 = trainControl(method="xgbTree", nrounds=2)
+
+# model = caret::train(subscribed ~ ., 
+#                      data = training, 
+#                      method="xgbDART"
+#                     )
+
+gbmGrid = expand.grid(
+  nrounds = 2,
+  max_depth = 3,
+  eta = 0.3,
+  gamma = 0,
+  colsample_bytree = 1,
+  min_child_weight = 1, 
+  subsample = 1
+)
+
+fit.xgbTree <- train(subscribed ~ .,  
+                     data=training, 
+                     method="xgbTree",
+                     tuneGrid=gbmGrid)
+
+# model_rf = caret::train(subscribed ~ ., 
+#                          data = training,
+#                          method = "rf", #random forest
+# trControl = trainControl(method = "repeatedcv", number = 10,repeats = 5, verboseIter = FALSE))
+
+predict(fit.xgbTree, training)
 # Create an explainer object
-explainer <- lime(iris_train, model)
+explainer = lime(training, fit.xgbTree)
+
 ```
 
 
 ```{r}
 # Explain new observation
-explanation <- explain(iris_test, explainer, n_labels = 1, n_features = 2)
+#explanation = explain(training[,-"subscribed"] %>% head(), explainer, n_labels = 1, n_features = 4)
+explanation = explain(training, 
+                      explainer, 
+                      n_labels = 1, 
+                      n_features = 2)
+
 ```
+
 ```{r}
 # And can be visualised directly
 plot_features(explanation)
 ```
 
+
+# Fuentes de código
+
+https://cran.r-project.org/web/packages/lime/vignettes/Understanding_lime.html
