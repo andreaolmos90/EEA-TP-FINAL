@@ -1,10 +1,12 @@
 ---
-title: "Interpretabilidad de modelos"
+title: "Interpretabilidad de modelos con LIME"
+subtitle: "⚔<br/>Para XGBoost"
 author: "Andrea Olmos, Ulises López"
-date: "19/11/2021"
-output: 
+institute: "EEA, UBA"
+date: "Actualizado: `r Sys.Date()`"
+output:
   slidy_presentation:
-    theme: paper
+    theme: cerulean
 ---
 
 # LIME
@@ -45,6 +47,7 @@ kable(head(dataset), format="simple")
 ```{r message=FALSE, warning=FALSE}
 
 # Dividimos el dataset con createDataPartition de caret
+set.seed(3456)
 inTrain = createDataPartition(
   y = dataset$subscribed, #la clase a predecir
   p = .75, #75% para train
@@ -59,25 +62,24 @@ testing  = dataset[-inTrain,]
 
 # Entrenamos xgboost con paquete Caret
 
-```{r}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 
 #Creamos la grilla de parámetros para xgbTree (los dejamos fijos por ahora)
 
-gbmGrid = expand.grid(
-  nrounds = 2,
-  max_depth = 3,
-  eta = 0.3,
-  gamma = 0,
-  colsample_bytree = 1,
-  min_child_weight = 1, 
-  subsample = 1
-)
+# gbmGrid = expand.grid(
+#   nrounds = 2,
+#   max_depth = 3,
+#   eta = 0.3,
+#   gamma = 0,
+#   colsample_bytree = 1,
+#   min_child_weight = 1,
+#   subsample = 1
+# )
 
 #Entrenamos el árbol con todas las variables
-fit.xgbTree_all = train(subscribed ~ .,  
+fit.xgbTree_all = train(subscribed ~ .,
                      data=training, #usamos los datos de train
-                     method="xgbTree",
-                    tuneGrid=gbmGrid)
+                     method="xgbTree")
 
 #tuneGrid=gbmGrid
 
@@ -152,7 +154,11 @@ explanation = explain(x = sample_explain[,-"subscribed"], #explicamos las observ
                       kernel_width = 1.5 #ancho del kernel
                       ) 
 #vemos el objeto
-explanation
+tibble::glimpse(explanation)
+
+#Documentación:
+#https://github.com/thomasp85/lime/blob/master/R/explain.R
+
 # A data.frame encoding the explanations one row per explained observation. The columns are:
 # model_type: The type of the model used for prediction.
 # case: The case being explained (the rowname in cases).
@@ -187,7 +193,7 @@ plot_explanations(explanation)
 
 Creamos un dataset sólo con variables numéricas (para poder probar otras medidas de distancia)
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 #creamos una máscara para poder seleccionar sólo las variables numéricas
 mascara = lapply(dataset, FUN=is.numeric)
 mascara = unlist(mascara, use.names = F)
@@ -195,11 +201,10 @@ mascara[21] = TRUE #para que se quede con la variable a predecir
 ```
 
 Entrenamos el árbol con sólo las variables numéricas
-```{r}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 fit.xgbTree_num = train(subscribed ~ .,  
                      data=training[, ..mascara], #usamos los datos de train mascareados
-                     method="xgbTree",
-                    tuneGrid=gbmGrid)
+                     method="xgbTree")
 
 predict(fit.xgbTree_num, testing)[1:200]
 ```
